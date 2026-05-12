@@ -1,0 +1,17 @@
+# 生成的缓存与输出目录
+__pycache__/
+data/
+figures/
+
+# 输出文件
+*.csv
+*.npz
+*.json
+*.png
+*.pdf
+
+# 系统文件
+*.swp
+*.bak
+.DS_Store
+Thumbs.db
