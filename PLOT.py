@@ -41,7 +41,7 @@ OUTPUT = None
 TITLE = None
 
 # ── 图片尺寸 / 分辨率 ────────────────────────────────────────────────────
-FIG_WIDTH  = 12
+FIG_WIDTH  = 9
 FIG_HEIGHT = 6
 DPI        = 150
 
@@ -71,6 +71,14 @@ UNITS = {
     'charge': 'C', 'power': 'W', 'resistance': chr(937),
     'capacitance': 'F', 'inductance': 'H',
 }
+
+
+# ── 辅助: 去掉变量名中的单位后缀 ────────────────────────────────────────
+def _strip_unit(name: str) -> str:
+    """'V1 (V)' → 'V1', 'time (s)' → 'time'"""
+    import re
+    m = re.match(r'^(.+?)\s*\(.*?\)\s*$', name)
+    return m.group(1).strip() if m else name.strip()
 
 
 # ── 数据加载 ──────────────────────────────────────────────────────────────
@@ -216,6 +224,7 @@ def plot(data: dict, x_idx: int, y_indices: list[int],
     x_name = data['var_names'][x_idx]
     x_type = data['var_types'][x_idx]
     x_unit = UNITS.get(x_type, '')
+    x_name_clean = _strip_unit(x_name)  # 去掉变量名中已自带的单位括号
 
     fig, ax1 = plt.subplots(figsize=figsize)
     ax2 = None
@@ -249,8 +258,8 @@ def plot(data: dict, x_idx: int, y_indices: list[int],
         ax2.set_ylabel(nj, fontsize=label_fontsize, color=cj)
         ax2.tick_params(axis='y', labelcolor=cj)
 
-    # ── X 轴标签 ──
-    ax1.set_xlabel(f'{x_name} ({x_unit})' if x_unit else x_name,
+    # ── X 轴标签（用干净的变量名 + 标准单位） ──
+    ax1.set_xlabel(f'{x_name_clean} ({x_unit})' if x_unit else x_name_clean,
                    fontsize=label_fontsize)
 
     # ── 图例（合并左右轴） ──
@@ -294,6 +303,8 @@ def main():
     p.add_argument('-o', '--output', default=None)
     p.add_argument('-t', '--title', default=None)
     p.add_argument('-l', '--list', action='store_true', help='仅列出变量')
+    p.add_argument('-W', '--width', type=float, default=None, help='图片宽度（英寸），覆盖 FIG_WIDTH')
+    p.add_argument('-H', '--height', type=float, default=None, help='图片高度（英寸），覆盖 FIG_HEIGHT')
     args = p.parse_args()
 
     data_file = args.data_file or DATA_FILE
@@ -301,6 +312,8 @@ def main():
     y_var     = args.yvar     or Y_VARS
     output    = args.output   or OUTPUT
     title     = args.title    or TITLE
+    fig_w     = args.width    or FIG_WIDTH
+    fig_h     = args.height   or FIG_HEIGHT
 
     if not data_file:
         print("错误: 未指定数据文件。请设置 DATA_FILE 或用命令行传参。")
@@ -325,11 +338,13 @@ def main():
         list_variables(data['var_names'], data['var_types'])
         sys.exit(1)
 
-    # 自动输出路径
+    # 自动输出路径 —— 【电路文件名】_【x轴】_【y轴】.png
     if output is None:
         fig_dir = SCRIPT_DIR / "figures"
         fig_dir.mkdir(parents=True, exist_ok=True)
-        out_path = fig_dir / f"{data_file.stem}.png"
+        x_name = _strip_unit(data['var_names'][x_idx])
+        y_names = '_'.join(_strip_unit(data['var_names'][i]) for i in y_indices)
+        out_path = fig_dir / f"{data_file.stem}_{x_name}_{y_names}.png"
     elif output.lower() == 'show':
         out_path = None
     else:
@@ -337,7 +352,8 @@ def main():
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
     plot(data, x_idx, y_indices, title=title,
-         output=str(out_path) if out_path else None)
+         output=str(out_path) if out_path else None,
+         figsize=(fig_w, fig_h))
 
 
 if __name__ == '__main__':
